@@ -1,0 +1,26 @@
+Source: rdf-dataset-integration
+Section: misc
+Priority: extra
+Architecture: all
+Maintainer: Sebastian Tramp <tramp@informatik.uni-leipzig.de>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.9.3
+Homepage: https://github.com/AKSW/rdf-dataset-integration
+Vcs-Git: git://github.com/AKSW/rdf-dataset-integration.git
+Vcs-Browser: https://github.com/AKSW/rdf-dataset-integration
+
+Package: rdf-dataset-integration
+Architecture: all
+Depends: ${misc:Depends}
+Description: RDF store integration for rdf-dataset-* packages
+ This package provides a way to automatically install rdf-dataset
+ packages on installation (and removing them with apt-get as well).
+ .
+ LOD2 is a large-scale integrating project co-funded by the European
+ Commission within the FP7 Information and Communication Technologies
+ Work Programme (Grant Agreement No. 257943). Commencing in September
+ 2010, this 4-year project comprises leading Linked Open Data technology
+ researchers, companies, and service providers from across 7 European
+ countries and is coordinated by the AKSW research group at the
+ University of Leipzig
+

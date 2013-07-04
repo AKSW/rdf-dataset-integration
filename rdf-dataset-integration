@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+
+## environment
+export name=`basename $0`
+
+export logfile="/var/log/rdf-dataset-integration.log" && touch $logfile
+
+export command="$1"
+export datadir="$2"
+export modeluri="$3"
+
+export virtetc="/etc/virtuoso-opensource-6.1"
+export bdfile="$virtetc/bd.ini"
+export config="$virtetc/virtuoso.ini"
+
+function output () {
+    echo "$1" | tee -a $logfile
+}
+
+# checks data directory
+function checkData () {
+    if [ "$datadir" == "" ];
+    then
+        output "$name: no datapath given"
+        output "Usage: $name {command} {***datapath***} {dataset URI}"
+        exit 1
+    fi
+    if [ "$modeluri" == "" ];
+    then
+        output "$name: no dataset URI given"
+        output "Usage: $name {command} {datapath} {***dataset URI***}"
+        exit 1
+    fi
+
+    dumpFile="data.nt.gz"
+    if [ ! -r "$datadir/$dumpFile" ];
+    then
+        output "$name: no $dumpFile in $datadir"
+        exit 0
+    else
+        export dataDump=$datadir/$dumpFile
+    fi
+}
+
+# modifies the virtuoso config in order to allow importing
+# TODO: maybe check/do this on installation?
+#function modifyVirtuosoConfig () {
+    #if [[ -w $config ]]; then
+        ## add dataset directory to DirsAllowed
+        ## try to remove the addition first in order to avoid double entries
+        #sed 's/^\(DirsAllowed.*\)\(, \/usr\/share\)\(.*\)/\1\3/' -i $config
+        #sed 's/^\(DirsAllowed.*\)/\1, \/usr\/share/' -i $config
+    #else
+        #output "$name: could not modify $config"
+        #exit 1
+    #fi
+#}
+
+function fetchCredentials () {
+    if [[ -r $bdfile ]]; then
+        username=`cat $bdfile | grep Username | cut -d "=" -f 2`
+        password=`cat $bdfile | grep Password | cut -d "=" -f 2`
+    else
+        output "$name: could not read $bdfile"
+        exit 1
+    fi
+    if [[ "$username" == "" ]]; then
+        output "$name: could not fetch username"
+        exit 1
+    fi
+    if [[ "$password" == "" ]]; then
+        output "$name: could not fetch password"
+        exit 1
+    fi
+    export username
+    export password
+    export isqlrun="isql-vt -U ${username} -P ${password}"
+}
+
+function removeDataset () {
+    if [ "$modeluri" == "" ];
+    then
+        output "$name: no dataset URI given"
+        output "Usage: $name {command} {datapath} {***dataset URI***}"
+        exit 1
+    fi
+    # drop graph
+    echo "SPARQL DROP SILENT GRAPH <${modeluri}>;" | $isqlrun >>$logfile
+}
+
+function importDataset () {
+    # de-zip the data dump
+    tmpfile=`mktemp`
+    zcat $dataDump >>$tmpfile
+
+    # create the knowledge base
+    echo "SPARQL CREATE SILENT GRAPH <${modeluri}>;" | $isqlrun >>$logfile
+
+    # TODO: split dump as done here https://code.google.com/p/aksw-commons/source/browse/scripts/virtuoso/virtload-classic.sh
+    echo "ttlp (file_to_string_output('${tmpfile}'), '', '${modeluri}');" | $isqlrun >>$logfile
+
+    # TODO: use the metadata file as well
+    #echo "ttlp (file_to_string_output('${datadir}/data.ttl'), '', '${modeluri}');" | $isqlrun >>$logfile
+
+    # remove the temp file
+    rm $tmpfile
+}
+
+
+### start
+
+# initial log stamp
+echo "" >>$logfile; echo "" >>$logfile; echo `date` $@ >>$logfile
+
+# act according to the parameter
+if [ "$command" == "" ];
+then
+    output "$name: no command given"
+    output "Usage: $name {***command***} {datapath} {dataset URI}"
+    exit 1
+else
+    case $command in
+        upgrade)
+            checkData || exit 0
+            fetchCredentials || exit 1
+            removeDataset
+            importDataset
+            ;;
+        remove)
+            fetchCredentials || exit 1
+            removeDataset
+            ;;
+        purge)
+            # nothing to do
+            ;;
+        configure)
+            checkData || exit 0
+            fetchCredentials || exit 1
+            importDataset
+            ;;
+        *)
+            output "$name: Nothing to do on '$command'"
+            exit 0
+    esac
+fi
+
